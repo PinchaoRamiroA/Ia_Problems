@@ -89,13 +89,5 @@ venv.bak/
 # Local .env files
 *.env
 
-# macOS
-.DS_Store
-
-# Windows
-Thumbs.db
-ehthumbs.db
-Desktop.ini
-
 # Other
 *.log
