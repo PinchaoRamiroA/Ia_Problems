@@ -1,34 +1,48 @@
-class Problem:
-    def __init__(self, initial, goal=None):
-        self.initial = initial
-        self.goal = goal
+from core.structures import MinHeap, Queue, Stack
+from core.abstracts import State, Problem
 
-    def actions(self, state):
-        """Devuelve lista de acciones posibles desde el estado."""
-        raise NotImplementedError
+# Representación: tupla de 9 ints; 0 = hueco
+GOAL = (1,2,3,4,5,6,7,8,0)
+GOAL_POS = {v:i for i,v in enumerate(GOAL)}
 
-    def result(self, state, action):
-        """Devuelve el nuevo estado aplicando la acción."""
-        raise NotImplementedError
+class PuzzleState(State):
+    __slots__ = ("tiles",)
+    def __init__(self, tiles): 
+        self.tiles = tuple(tiles)
 
-    def is_goal(self, state):
-        """Verifica si es estado objetivo."""
-        return state == self.goal
+    def key(self): 
+        return self.tiles
 
-    def cost(self, state1, action, state2):
-        """Devuelve el costo de pasar de state1 a state2."""
-        return 1  # por defecto, costo uniforme
+    def __repr__(self): 
+        return f"PuzzleState{self.tiles}"
 
+class Puzzle(Problem):
+    def __init__(self, start):
+        self.start = PuzzleState(start)
 
-class EightPuzzle(Problem):
-    def __init__(self, initial, goal):
-        super().__init__(initial, goal)
+    def initial_state(self) -> State: 
+        return self.start
 
-    def actions(self, state):
-        pass  # TODO: mover el hueco (0) arriba/abajo/izq/der si se puede
+    def is_goal(self, s: PuzzleState) -> bool: 
+        return s.tiles == GOAL
 
-    def result(self, state, action):
-        pass  # TODO: intercambiar 0 con vecino
+    def actions(self, s: PuzzleState):
+        i = s.tiles.index(0); x,y = divmod(i,3)
+        for dx,dy,a in ((1,0,"DOWN"),(-1,0,"UP"),(0,1,"RIGHT"),(0,-1,"LEFT")):
+            nx,ny = x+dx,y+dy
+            if 0 <= nx < 3 and 0 <= ny < 3: 
+                yield a
 
-    def is_goal(self, state):
-        return state == self.goal
+    def result(self, s: PuzzleState, a):
+        delta = {"DOWN":(1,0),"UP":(-1,0),"RIGHT":(0,1),"LEFT":(0,-1)}[a]
+        i = s.tiles.index(0); x,y = divmod(i,3)
+        nx,ny = x+delta[0], y+delta[1]; j = nx*3+ny
+        tiles = list(s.tiles); tiles[i], tiles[j] = tiles[j], tiles[i]
+        
+        new_state = PuzzleState(tiles)
+        return new_state
+
+    def print_state(self, s: PuzzleState):
+        for i in range(0, 9, 3):
+            print(s.tiles[i:i+3])
+        print()

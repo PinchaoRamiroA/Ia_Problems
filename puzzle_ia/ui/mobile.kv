@@ -1,0 +1,35 @@
+ScreenManager:
+    MainScreen:
+    PuzzleScreen:
+
+<MainScreen>:
+    name: "main"
+    BoxLayout:
+        orientation: "vertical"
+        spacing: 10
+        padding: 20
+
+        Spinner:
+            id: algorithm_spinner
+            text: "Elige Algoritmo"
+            values: ["BFS", "DFS", "UCS", "Greedy", "A*", "Weighted A*"]
+            size_hint_y: 0.2
+
+        Spinner:
+            id: heuristic_spinner
+            text: "Elige Heurística"
+            values: ["misplaced", "manhattan", "linear_conflict"]
+            size_hint_y: 0.2
+
+        Button:
+            text: "Resolver"
+            size_hint_y: 0.2
+            on_press: root.on_solve()
+
+<PuzzleScreen>:
+    name: "puzzle"
+    BoxLayout:
+        orientation: "vertical"
+        GridLayout:
+            id: grid
+            cols: 3
