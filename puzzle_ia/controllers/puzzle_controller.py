@@ -2,7 +2,6 @@ import time
 from kivy.clock import Clock
 from core.heuristics import manhattan, misplaced, linear_conflict
 from ui.dispatcher import solve_puzzle
-from kivy.uix.button import Button
 from core.problem import Puzzle, PuzzleState
 from core.abstracts import State
 
@@ -13,11 +12,17 @@ class PuzzleController:
         self.metrics = metrics
         self.solution_steps = []
         self.current_step_index = 0
-        self.animation_event = None
-        self.is_animating = False
 
+        # ---- animación ----
+        self.anim_event = None
+        self.anim_speed = 0.5
+        self.is_animating = False
+        self.is_paused = False
+
+    # ------------------------
+    # Spinners
+    # ------------------------
     def on_algorithm_selected(self, spinner, text):
-        """Muestra u oculta el selector de heurísticas según el algoritmo elegido."""
         heuristic_algos = ["A*", "Greedy", "Weighted A*", "IDA*"]
         if text in heuristic_algos:
             self.app.layout.heuristic_spinner.opacity = 1
@@ -27,8 +32,10 @@ class PuzzleController:
             self.app.layout.heuristic_spinner.disabled = True
             self.app.layout.heuristic_spinner.text = "Choose the heuristic"
 
+    # ------------------------
+    # Play principal
+    # ------------------------
     def on_play_button_press(self, instance):
-        """Se activa al presionar el botón de Play."""
         selected_algorithm = self.app.layout.algo_spinner.text
         if selected_algorithm == "Choose the algorithm":
             self.app.show_popup("Error", "Please select an algorithm first.")
@@ -41,18 +48,15 @@ class PuzzleController:
         self.app.layout.play_button.text = "Solving..."
         self.app.layout.play_button.disabled = True
 
-        # Iniciar la búsqueda del algoritmo en un hilo separado o un cronómetro
-        # para evitar bloquear la UI
         Clock.schedule_once(lambda dt: self.solve_puzzle(selected_algorithm), 0.1)
 
     def solve_puzzle(self, algorithm_name):
-        """Resuelve el puzzle usando el algoritmo seleccionado y almacena los pasos."""
         print(f"Starting to solve with {algorithm_name}...")
 
         solution_path = None
         expanded_nodes = 0
         elapsed_time = 0
-        
+
         try:
             start_time = time.time()
             heuristics = {
@@ -63,17 +67,19 @@ class PuzzleController:
             heuristic = self.app.layout.heuristic_spinner.text
             heuristic_func = heuristics.get(heuristic)
 
-            
             if algorithm_name in ["A*", "Greedy", "Weighted A*", "IDA*"]:
                 if heuristic_func:
-                    solution_path, expanded_nodes = solve_puzzle(self.problem, algorithm_name, heuristic=heuristic_func)
+                    solution_path, expanded_nodes = solve_puzzle(
+                        self.problem, algorithm_name, heuristic=heuristic_func
+                    )
                 else:
                     self.error_solution("Please select a heuristic for this algorithm.")
                     return
             else:
                 solution_path, expanded_nodes = solve_puzzle(self.problem, algorithm_name)
-            
+
             elapsed_time = time.time() - start_time
+
         except ValueError as e:
             self.app.show_popup("Error", str(e))
             return
@@ -81,105 +87,159 @@ class PuzzleController:
             self.app.show_popup("Error", f"An unexpected error occurred: {e}")
             return
         finally:
-            if solution_path is not None and isinstance(solution_path, (list, tuple)):
-                if solution_path:
-                    # Validar que los elementos en la solución sean del tipo correcto
-                    if all(hasattr(node.state, 'tiles') for node in solution_path):
-                        self.solution_steps = solution_path
-                        self.current_step_index = 0
-                        self.is_animating = True
-                        self.app.layout.play_button.text = "Solving..."
-                        self.animation_event = Clock.schedule_interval(self.animate_solution, 0.5)
-
-                        self.metrics.set(
-                            algoritmo=algorithm_name,
-                            heuristica=heuristic if heuristic_func else None,
-                            solucion_encontrada=True,
-                            pasos=len(solution_path) - 1,
-                            nodos_expandidos=expanded_nodes,
-                            tiempo=round(elapsed_time, 4)
-                        )
-
-                    else:
-                        self.error_solution("Invalid solution path.")
-                else:
-                    self.error_solution("No solution found for this puzzle state.")
+            if solution_path and all(hasattr(node.state, 'tiles') for node in solution_path):
+                self.solution_steps = solution_path
+                self.current_step_index = 0
+                self.metrics.set(
+                    algoritmo=algorithm_name,
+                    heuristica=heuristic if heuristic_func else None,
+                    solucion_encontrada=True,
+                    pasos=len(solution_path) - 1,
+                    nodos_expandidos=expanded_nodes,
+                    tiempo=round(elapsed_time, 4)
+                )
+                self.start_animation()
             else:
-                self.error_solution("No solution found or returned value is not a list of states.")
+                self.error_solution("No solution found or invalid solution path.")
 
-    def animate_solution(self, dt):
-        """
-        Actualiza la UI para mostrar el siguiente paso de la solución.
-        """
+    # ------------------------
+    # Animación con play/pause/step
+    # ------------------------
+    def start_animation(self):
+        if not self.solution_steps:
+            return
+        self.stop_animation()
+        self.is_animating = True
+        self.is_paused = False
+        self.app.layout.anim_toggle.text = "Pause"
+        self.anim_event = Clock.schedule_interval(self._tick, self.anim_speed)
+
+    def _tick(self, dt):
+        if self.is_paused:
+            return
         if self.current_step_index < len(self.solution_steps):
-            # Accede al atributo '.state' del nodo antes de pasarlo a la UI
-            state_to_display = self.solution_steps[self.current_step_index].state
-            self.update_board_ui(state_to_display)
+            state = self.solution_steps[self.current_step_index].state
+            self.update_board_ui(state)
             self.current_step_index += 1
         else:
-            # Detiene la animación cuando se ha mostrado toda la solución
-            if self.animation_event:
-                self.animation_event.cancel()
-            self.is_animating = False
+            self.stop_animation()
             self.app.layout.play_button.text = "Again?"
             self.app.layout.play_button.disabled = False
             self.app.display_metrics()
 
-    def update_board_ui(self, state: State):
-        """
-        Actualiza el tablero de la UI con los valores de un estado dado.
-        """
+    def toggle_play_pause(self, *_):
+        if not self.solution_steps:
+            return
+        if not self.is_animating:
+            self.start_animation()
+            return
+        self.is_paused = not self.is_paused
+        self.app.layout.anim_toggle.text = "Play" if self.is_paused else "Pause"
 
-        # Limpia el tablero actual
-        self.app.layout.board_layout.clear_widgets()
+    def step_forward(self, *_):
+        if not self.solution_steps:
+            return
+        if self.is_animating and not self.is_paused:
+            self.toggle_play_pause()
+        if self.current_step_index < len(self.solution_steps):
+            state = self.solution_steps[self.current_step_index].state
+            self.update_board_ui(state)
+            self.current_step_index += 1
 
-        # Llena el tablero con los nuevos valores
-        for index, tile in enumerate(state.tiles):
-            # Los botones que representan el espacio vacío pueden tener un estilo diferente
-            if tile == 0:
-                btn = self.app.layout.create_tile(0, index)  # Espacio vacío
-            else:
-                btn = self.app.layout.create_tile(tile, index)
-            self.app.layout.board_layout.add_widget(btn)
+    def step_back(self, *_):
+        if not self.solution_steps:
+            return
+        if self.is_animating and not self.is_paused:
+            self.toggle_play_pause()
+        if self.current_step_index >= 2:
+            self.current_step_index -= 2
+            self.step_forward()
 
+    def on_speed_change(self, slider, value):
+        self.anim_speed = max(0.05, float(value))
+        if self.anim_event and self.is_animating and not self.is_paused:
+            self.anim_event.cancel()
+            self.anim_event = Clock.schedule_interval(self._tick, self.anim_speed)
+
+    def stop_animation(self):
+        if self.anim_event:
+            self.anim_event.cancel()
+            self.anim_event = None
+        self.is_animating = False
+        self.is_paused = False
+        self.current_step_index = 0
+        if hasattr(self.app.layout, "anim_toggle"):
+            self.app.layout.anim_toggle.text = "Play"
+
+    # ------------------------
+    # Juego manual
+    # ------------------------
     def on_tile_press(self, index):
-        """Maneja el click en una celda para mover manualmente las fichas."""
         if self.is_animating:
-            return  # Desactiva interacción mientras se anima
-
-        current_state = self.problem.start  # PuzzleState actual
-        tiles = list(current_state.tiles)   # copiamos porque es tupla
-
+            return
+        current_state = self.problem.start
+        tiles = list(current_state.tiles)
         empty_index = tiles.index(0)
-
-        # Solo si la ficha es vecina al hueco
         if self.is_adjacent(index, empty_index):
-            # Intercambiar
             tiles[empty_index], tiles[index] = tiles[index], tiles[empty_index]
-
-            # Nuevo estado
             new_state = PuzzleState(tiles)
-            self.problem.start = new_state  # <<<< guardar como nuevo inicio
-            self.app.layout.reset_board(new_state.tiles)  # refrescar tablero
-
-            # Verifica si es victoria
+            self.problem.start = new_state
+            self.app.layout.reset_board(new_state.tiles)
             if self.is_goal_state(new_state):
                 self.app.show_popup("¡Victoria!", "Has resuelto el puzzle.")
                 self.app.layout.play_button.text = "Again?"
                 self.app.layout.play_button.disabled = False
 
-
     def is_adjacent(self, i1, i2):
-        """Verifica si dos posiciones son adyacentes en la grilla 3x3."""
         x1, y1 = divmod(i1, 3)
         x2, y2 = divmod(i2, 3)
         return abs(x1 - x2) + abs(y1 - y2) == 1
 
     def is_goal_state(self, state: State) -> bool:
-        """Verifica si el estado actual es el estado objetivo."""
         return self.problem.is_goal(state)
+
+    # ------------------------
+    # Utilidades
+    # ------------------------
+    def update_board_ui(self, state: State):
+        self.app.layout.board_layout.clear_widgets()
+        for index, tile in enumerate(state.tiles):
+            btn = self.app.layout.create_tile(tile, index)
+            self.app.layout.board_layout.add_widget(btn)
 
     def error_solution(self, message):
         self.app.show_popup("Error", message)
         self.app.layout.play_button.text = "Play"
         self.app.layout.play_button.disabled = False
+
+    # ------------------------
+    # Comparador de heurísticas
+    # ------------------------
+    def run_heuristic_comparison(self, *_ , algorithm="A*"):
+        cases = [
+            ("Manhattan",        manhattan),
+            ("Misplaced Tiles",  misplaced),
+            ("Linear Conflict",  linear_conflict),
+        ]
+        rows = []
+        for name, h in cases:
+            t0 = time.perf_counter()
+            try:
+                path, expanded = solve_puzzle(self.problem, algorithm, heuristic=h)
+                elapsed = time.perf_counter() - t0
+                steps = len(path) - 1 if path else None
+                rows.append({
+                    "Heurística": name,
+                    "Tiempo (s)": round(elapsed, 4),
+                    "Pasos": steps if steps is not None else "-",
+                    "Expandidos": expanded
+                })
+            except Exception as e:
+                rows.append({
+                    "Heurística": name,
+                    "Tiempo (s)": None,
+                    "Pasos": None,
+                    "Expandidos": None,
+                    "Error": str(e)
+                })
+        self.app.show_comparison(rows, title=f"Comparación ({algorithm})")
