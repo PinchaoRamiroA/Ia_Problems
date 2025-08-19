@@ -9,34 +9,13 @@ from kivy.uix.popup import Popup
 from kivy.clock import Clock
 import time
 
-# Asume que estas clases están en los archivos core/
-# El código para estas clases se mantuvo en el hilo de conversación anterior
 from core.create_puzzle import create_state
 from core.problem import Puzzle
 from core.abstracts import State
 from core.heuristics import manhattan, misplaced, linear_conflict
-from core.algorithms import BFS, DFS, UCS, Greedy, A_star, IDA_star, Weighted_A_star
 
-kivy.require('1.9.0')
-
-
-def solve_puzzle(problem, algorithm, heuristic=None, weight=1.5):
-    if algorithm == "BFS":
-        return BFS(problem)
-    elif algorithm == "DFS":
-        return DFS(problem)
-    elif algorithm == "UCS":
-        return UCS(problem)
-    elif algorithm == "Greedy":
-        return Greedy(problem, heuristic)
-    elif algorithm == "A*":
-        return A_star(problem, heuristic)
-    elif algorithm == "Weighted A*":
-        return Weighted_A_star(problem, heuristic, weight)
-    elif algorithm == "IDA*":
-        return IDA_star(problem, heuristic)
-    else:
-        raise ValueError("Algoritmo no soportado")
+from ui.dispatcher import solve_puzzle
+from metrics.evaluator import Metrics
     
 class PuzzleApp(App):
     def __init__(self, **kwargs):
@@ -50,60 +29,72 @@ class PuzzleApp(App):
         self.current_step_index = 0
         self.animation_event = None
         self.is_animating = False
+        self.metrics : Metrics = Metrics()
 
     def build(self):
-        """
-        Este método es llamado por Kivy para construir la interfaz de usuario.
-        No recibe argumentos.
-        """
         # Creación del problema inicial
         initial_state = create_state()
         self.problem = Puzzle(initial_state)
 
-        # Layout principal de la aplicación (vertical)
         main_layout = BoxLayout(orientation='vertical', padding=15, spacing=20)
 
-        # Contenedor para la cabecera (título y controles)
+        # Cabecera
         header_layout = BoxLayout(orientation='vertical', size_hint_y=0.2)
         
-        # Fila del título
         title_row = BoxLayout(orientation='horizontal')
         title = Label(text='Puzzle-IA', font_size='24sp', size_hint_x=0.8, halign='left')
         title_row.add_widget(title)
         
-        # Fila de los controles
         controls_row = BoxLayout(orientation='horizontal', spacing=10)
+
+        # Spinner de algoritmos
         self.algo_spinner = Spinner(
             text='Choose the algorithm',
-            values=('BFS', 'DFS', 'UCS', 'Greedy', 'A*', 'Weighted A*', 'IDA*'),  # Actualizado con todos los algoritmos
+            values=('BFS', 'DFS', 'UCS', 'Greedy', 'A*', 'Weighted A*', 'IDA*'),
             size_hint=(0.7, 1)
         )
+        # Evento para mostrar/ocultar heurísticas
         self.algo_spinner.bind(text=self.on_algorithm_selected)
-        
+
+        # Spinner de heurísticas (inicialmente oculto)
+        self.heuristic_spinner = Spinner(
+            text='Choose the heuristic',
+            values=('Manhattan', 'Misplaced Tiles', 'Linear Conflict'),
+            size_hint=(0.7, 1)
+        )
+        self.heuristic_spinner.opacity = 0
+        self.heuristic_spinner.disabled = True
+
+        # Botón play
         self.play_button = Button(text='▶', size_hint=(0.3, 1), font_size='32sp')
         self.play_button.bind(on_press=self.on_play_button_press)
 
         controls_row.add_widget(self.algo_spinner)
+        controls_row.add_widget(self.heuristic_spinner)
         controls_row.add_widget(self.play_button)
         
         header_layout.add_widget(title_row)
         header_layout.add_widget(controls_row)
 
-        # Tablero del puzzle (GridLayout de 3x3)
+        # Tablero
         self.board_layout = GridLayout(cols=3, rows=3, padding=5, spacing=5, size_hint_y=0.8)
-        
-        # Inicializa el tablero con el estado inicial del puzzle
         self.update_board_ui(self.problem.initial_state())
 
-        # Añadir todos los layouts al layout principal
         main_layout.add_widget(header_layout)
         main_layout.add_widget(self.board_layout)
         
         return main_layout
 
     def on_algorithm_selected(self, spinner, text):
-        """Se activa cuando se selecciona un algoritmo del Spinner."""
-        print(f"Algorithm selected: {text}")
+        """Muestra u oculta el selector de heurísticas según el algoritmo elegido."""
+        heuristic_algos = ["A*", "Greedy", "Weighted A*", "IDA*"]
+        if text in heuristic_algos:
+            self.heuristic_spinner.opacity = 1
+            self.heuristic_spinner.disabled = False
+        else:
+            self.heuristic_spinner.opacity = 0
+            self.heuristic_spinner.disabled = True
+            self.heuristic_spinner.text = "Choose the heuristic"
 
     def on_play_button_press(self, instance):
         """Se activa al presionar el botón de Play."""
@@ -125,41 +116,78 @@ class PuzzleApp(App):
 
     def solve_puzzle(self, algorithm_name):
         """Resuelve el puzzle usando el algoritmo seleccionado y almacena los pasos."""
-        
         print(f"Starting to solve with {algorithm_name}...")
         
+        solution_path = None
+        expanded_nodes = 0
+        elapsed_time = 0
+        
         try:
-            # Los algoritmos A* y otros necesitan una heurística.
+            start_time = time.time()
+            heuristic_name = self.heuristic_spinner.text
+            heuristic_func = None
+            if heuristic_name == "Manhattan":
+                heuristic_func = manhattan
+            elif heuristic_name == "Misplaced Tiles":
+                heuristic_func = misplaced
+            elif heuristic_name == "Linear Conflict":
+                heuristic_func = linear_conflict
+            
             if algorithm_name in ["A*", "Greedy", "Weighted A*", "IDA*"]:
-                # Asume que manhattan_distance está implementado en core.algorithms
-                solution_path, extended = solve_puzzle(self.problem, algorithm_name, heuristic=manhattan)
+                if heuristic_func:
+                    solution_path, expanded_nodes = solve_puzzle(self.problem, algorithm_name, heuristic=heuristic_func)
+                else:
+                    self.show_popup("Error", "Please select a heuristic for this algorithm.")
+                    self.play_button.text = "▶"
+                    self.play_button.disabled = False
+                    return
             else:
-                solution_path, extended = solve_puzzle(self.problem, algorithm_name)
+                solution_path, expanded_nodes = solve_puzzle(self.problem, algorithm_name)
+            
+            elapsed_time = time.time() - start_time
         except ValueError as e:
             self.show_popup("Error", str(e))
-            self.play_button.text = "▶"
-            self.play_button.disabled = False
-            return
-            
-        if solution_path:
-            print("Solution found!")
-            self.solution_steps = solution_path
-            self.current_step_index = 0
-            self.is_animating = True
-            self.play_button.text = "Animating..."
-            # Inicia la animación en la UI
-            self.animation_event = Clock.schedule_interval(self.animate_solution, 0.5)
-        else:
-            self.show_popup("Error", "No solution found for this puzzle state.")
-            self.play_button.text = "▶"
-            self.play_button.disabled = False
+        except Exception as e:
+            self.show_popup("Error", f"An unexpected error occurred: {e}")
+        finally:
+            if solution_path is not None and isinstance(solution_path, (list, tuple)):
+                if solution_path:
+                    # Validar que los elementos en la solución sean del tipo correcto
+                    if all(hasattr(node.state, 'tiles') for node in solution_path):
+                        self.solution_steps = solution_path
+                        self.current_step_index = 0
+                        self.is_animating = True
+                        self.play_button.text = "Animating..."
+                        self.animation_event = Clock.schedule_interval(self.animate_solution, 0.5)
+
+                        self.metrics.set(
+                            algoritmo=algorithm_name,
+                            solucion_encontrada=True,
+                            pasos=len(solution_path) - 1,
+                            nodos_expandidos=expanded_nodes,
+                            tiempo=round(elapsed_time, 4)
+                        )
+
+                    else:
+                        self.show_popup("Error", "The solution path contains nodes without a 'tiles' attribute.")
+                        self.play_button.text = "▶"
+                        self.play_button.disabled = False
+                else:
+                    self.show_popup("Error", "No solution found for this puzzle state.")
+                    self.play_button.text = "▶"
+                    self.play_button.disabled = False
+            else:
+                self.show_popup("Error", "No solution found or returned value is not a list of states.")
+                self.play_button.text = "▶"
+                self.play_button.disabled = False
 
     def animate_solution(self, dt):
         """
         Actualiza la UI para mostrar el siguiente paso de la solución.
         """
         if self.current_step_index < len(self.solution_steps):
-            state_to_display = self.solution_steps[self.current_step_index]
+            # Accede al atributo '.state' del nodo antes de pasarlo a la UI
+            state_to_display = self.solution_steps[self.current_step_index].state
             self.update_board_ui(state_to_display)
             self.current_step_index += 1
         else:
@@ -169,12 +197,14 @@ class PuzzleApp(App):
             self.is_animating = False
             self.play_button.text = "Done"
             self.play_button.disabled = False
-            self.show_popup("Success", "Puzzle solved!")
+            self.display_metrics()
 
     def update_board_ui(self, state: State):
         """
         Actualiza el tablero de la UI con los valores de un estado dado.
         """
+        # La validación ahora es redundante si se corrige animate_solution,
+        # pero es buena práctica mantenerla.
         if not hasattr(state, 'tiles'):
             print("Error: El objeto de estado no tiene el atributo 'tiles'.")
             return
@@ -190,6 +220,10 @@ class PuzzleApp(App):
             else:
                 btn = Button(text=str(tile), font_size='36sp')
             self.board_layout.add_widget(btn)
+
+    def display_metrics(self):
+        """Muestra las métricas de la solución en un popup."""
+        self.show_popup("Métricas de Solución", self.metrics.get_metrics_string())
 
     def show_popup(self, title, message):
         """Muestra una ventana emergente."""
