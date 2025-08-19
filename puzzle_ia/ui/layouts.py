@@ -14,20 +14,20 @@ class PuzzleLayout(BoxLayout):
         # ===============================
         # Cabecera
         # ===============================
-        header_layout = BoxLayout(orientation='vertical', size_hint_y=0.3, spacing=10)
+        header_layout = BoxLayout(orientation='vertical', size_hint_y=0.35, spacing=10)
 
         # Título centrado
         title = Label(
             text='[b]Puzzle-IA[/b]',
             markup=True,
             font_size='32sp',
-            size_hint=(1, 0.5),
+            size_hint=(1, 0.4),
             halign='center',
             valign='middle'
         )
 
         # Fila de selección de algoritmos
-        algo_row = BoxLayout(orientation='horizontal', spacing=10, size_hint_y=0.25)
+        algo_row = BoxLayout(orientation='horizontal', spacing=10, size_hint_y=0.2)
         algo_row.add_widget(Label(text="Algorithm:", size_hint=(0.3, 1), halign="right", valign="middle"))
 
         self.algo_spinner = Spinner(
@@ -39,7 +39,7 @@ class PuzzleLayout(BoxLayout):
         algo_row.add_widget(self.algo_spinner)
 
         # Fila de selección de heurísticas
-        heur_row = BoxLayout(orientation='horizontal', spacing=10, size_hint_y=0.25)
+        heur_row = BoxLayout(orientation='horizontal', spacing=10, size_hint_y=0.2)
         heur_row.add_widget(Label(text="Heuristic:", size_hint=(0.3, 1), halign="right", valign="middle"))
 
         self.heuristic_spinner = Spinner(
@@ -51,26 +51,49 @@ class PuzzleLayout(BoxLayout):
         )
         heur_row.add_widget(self.heuristic_spinner)
 
-        # Botón de ejecución (centrado)
-        play_row = BoxLayout(orientation='horizontal', size_hint_y=0.25, padding=(0, 10))
+        # Fila de botones (Play, Reset, New)
+        buttons_row = BoxLayout(orientation='horizontal', spacing=15, size_hint_y=0.2, padding=(0, 5))
+
         self.play_button = Button(
-            text='play',
-            size_hint=(0.5, 1),
-            font_size='24sp',
+            text='Play',
+            size_hint=(0.33, 1),
+            font_size='20sp',
             background_normal='',
             background_color=(0.2, 0.6, 0.2, 1),
             color=(1, 1, 1, 1)
         )
         self.play_button.bind(on_press=self.controller.on_play_button_press)
-        play_row.add_widget(Label(size_hint=(0.25, 1)))  # Espaciador
-        play_row.add_widget(self.play_button)
-        play_row.add_widget(Label(size_hint=(0.25, 1)))  # Espaciador
+
+        self.reset_button = Button(
+            text='Reset',
+            size_hint=(0.33, 1),
+            font_size='20sp',
+            background_normal='',
+            background_color=(0.7, 0.2, 0.2, 1),
+            color=(1, 1, 1, 1)
+        )
+        self.reset_button.bind(on_press=lambda instance: self.controller.app.reset_puzzle())
+
+        self.new_button = Button(
+            text='New',
+            size_hint=(0.33, 1),
+            font_size='20sp',
+            background_normal='',
+            background_color=(0.2, 0.2, 0.7, 1),
+            color=(1, 1, 1, 1)
+        )
+        self.new_button.bind(on_press=lambda instance: self.controller.app.new_puzzle())
+
+        buttons_row.add_widget(self.play_button)
+        buttons_row.add_widget(self.reset_button)
+        buttons_row.add_widget(self.new_button)
+
 
         # Añadir todo al header
         header_layout.add_widget(title)
         header_layout.add_widget(algo_row)
         header_layout.add_widget(heur_row)
-        header_layout.add_widget(play_row)
+        header_layout.add_widget(buttons_row)
 
         # ===============================
         # Tablero
@@ -80,11 +103,11 @@ class PuzzleLayout(BoxLayout):
             rows=3,
             padding=5,
             spacing=5,
-            size_hint_y=0.7
+            size_hint_y=0.65
         )
 
-        for tile in initial_state:
-            self.board_layout.add_widget(self.create_tile(tile))
+        for index, tile in enumerate(initial_state):
+            self.board_layout.add_widget(self.create_tile(tile, index))
 
         # ===============================
         # Estructura general
@@ -95,19 +118,20 @@ class PuzzleLayout(BoxLayout):
     # -------------------------------
     # Helpers
     # -------------------------------
-    def create_tile(self, value: int) -> Button:
+    def create_tile(self, value: int, index: int):
         """Crea un botón para representar una celda del puzzle."""
-        if value == 0:
-            return Button(
-                text='',
-                font_size='36sp',
-                background_normal='',
-                background_color=(0.8, 0.8, 0.8, 1)  # gris claro para el espacio vacío
-            )
-        return Button(
-            text=str(value),
+        btn = Button(
+            text='' if value == 0 else str(value),
             font_size='36sp',
             background_normal='',
-            background_color=(0.2, 0.4, 0.8, 1),  # azul para piezas
-            color=(1, 1, 1, 1)  # texto blanco
+            background_color=(0, 0, 0, 0) if value == 0 else (0.2, 0.4, 0.5, 1),
+            color=(1, 1, 1, 1)
         )
+        btn.bind(on_press=lambda inst: self.controller.on_tile_press(index))
+        return btn
+
+    def reset_board(self, new_state):
+        """Reinicia el tablero con un nuevo estado."""
+        self.board_layout.clear_widgets()
+        for index, tile in enumerate(new_state):
+            self.board_layout.add_widget(self.create_tile(tile, index))
