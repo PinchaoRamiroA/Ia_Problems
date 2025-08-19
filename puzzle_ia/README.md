@@ -35,14 +35,12 @@ Para los algoritmos de búsqueda informada, se pueden seleccionar las siguientes
 
     Linear Conflict: Una mejora de la distancia de Manhattan que cuenta los pares de fichas en la misma fila o columna que están en conflicto.
 
-⚙️ Requisitos y Dependencias
-
-Para ejecutar la aplicación, necesitas tener instalado Python. Las dependencias principales son:
+Requisitos y Dependencias
 
     Kivy: El framework de Python para el desarrollo de aplicaciones.
     matplotlib: Para crear el grafico comparativo
 
-💻 Instalación y Uso
+Instalación y Uso
 
     Clonar el repositorio
 
