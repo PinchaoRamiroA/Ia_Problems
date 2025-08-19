@@ -13,5 +13,7 @@ def solve_puzzle(problem, algorithm, heuristic=None, weight=1.5):
         return A_star(problem, heuristic)
     elif algorithm == "Weighted A*":
         return Weighted_A_star(problem, heuristic, weight)
+    elif algorithm == "IDA*":
+        return IDA_star(problem, heuristic)
     else:
         raise ValueError("Algoritmo no soportado")
