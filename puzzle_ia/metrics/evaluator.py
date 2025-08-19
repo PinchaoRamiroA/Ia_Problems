@@ -45,21 +45,32 @@ class Metrics:
         self.metrics = {
             "algoritmo": None,
             "solucion_encontrada": False,
+            "heuristica": None,
             "pasos": 0,
             "nodos_expandidos": 0,
             "tiempo": 0.0
         }
 
-    def set(self, algoritmo, solucion_encontrada, pasos, nodos_expandidos, tiempo):
+    def set(self, algoritmo, heuristica, solucion_encontrada, pasos, nodos_expandidos, tiempo):
         self.metrics.update({
             "algoritmo": algoritmo,
             "solucion_encontrada": solucion_encontrada,
+            "heuristica": heuristica,
             "pasos": pasos,
             "nodos_expandidos": nodos_expandidos,
             "tiempo": tiempo
         })
 
     def get_metrics_string(self):
+        if self.metrics["heuristica"]:
+            return (
+                f"Algoritmo: {self.metrics['algoritmo']}\n"
+                f"Heurística: {self.metrics['heuristica']}\n"
+                f"Solución encontrada: {'Sí' if self.metrics['solucion_encontrada'] else 'No'}\n"
+                f"Pasos: {self.metrics['pasos']}\n"
+                f"Nodos expandidos: {self.metrics['nodos_expandidos']}\n"
+                f"Tiempo de ejecución: {self.metrics['tiempo']} segundos"
+            )
         return (
             f"Algoritmo: {self.metrics['algoritmo']}\n"
             f"Solución encontrada: {'Sí' if self.metrics['solucion_encontrada'] else 'No'}\n"

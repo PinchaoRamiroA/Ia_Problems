@@ -49,8 +49,6 @@ class PuzzleController:
         """Resuelve el puzzle usando el algoritmo seleccionado y almacena los pasos."""
         print(f"Starting to solve with {algorithm_name}...")
 
-        start_state = self.problem.start
-        
         solution_path = None
         expanded_nodes = 0
         elapsed_time = 0
@@ -62,16 +60,15 @@ class PuzzleController:
                 "Misplaced Tiles": misplaced,
                 "Linear Conflict": linear_conflict,
             }
-            heuristic_func = heuristics.get(self.app.layout.heuristic_spinner.text)
+            heuristic = self.app.layout.heuristic_spinner.text
+            heuristic_func = heuristics.get(heuristic)
 
             
             if algorithm_name in ["A*", "Greedy", "Weighted A*", "IDA*"]:
                 if heuristic_func:
                     solution_path, expanded_nodes = solve_puzzle(self.problem, algorithm_name, heuristic=heuristic_func)
                 else:
-                    self.app.show_popup("Error", "Please select a heuristic for this algorithm.")
-                    self.app.layout.play_button.text = "play"
-                    self.app.layout.play_button.disabled = False
+                    self.error_solution("Please select a heuristic for this algorithm.")
                     return
             else:
                 solution_path, expanded_nodes = solve_puzzle(self.problem, algorithm_name)
@@ -91,11 +88,12 @@ class PuzzleController:
                         self.solution_steps = solution_path
                         self.current_step_index = 0
                         self.is_animating = True
-                        self.app.layout.play_button.text = "Animating..."
+                        self.app.layout.play_button.text = "Solving..."
                         self.animation_event = Clock.schedule_interval(self.animate_solution, 0.5)
 
                         self.metrics.set(
-                            algoritmo=algorithm_name + " (con heurística: " + self.app.layout.heuristic_spinner.text + ")",
+                            algoritmo=algorithm_name,
+                            heuristica=heuristic if heuristic_func else None,
                             solucion_encontrada=True,
                             pasos=len(solution_path) - 1,
                             nodos_expandidos=expanded_nodes,
@@ -103,17 +101,11 @@ class PuzzleController:
                         )
 
                     else:
-                        self.show_popup("Error", "The solution path contains nodes without a 'tiles' attribute.")
-                        self.play_button.text = "Play"
-                        self.play_button.disabled = False
+                        self.error_solution("Invalid solution path.")
                 else:
-                    self.show_popup("Error", "No solution found for this puzzle state.")
-                    self.play_button.text = "Play"
-                    self.play_button.disabled = False
+                    self.error_solution("No solution found for this puzzle state.")
             else:
-                self.app.show_popup("Error", "No solution found or returned value is not a list of states.")
-                self.app.layout.play_button.text = "Play"
-                self.app.layout.play_button.disabled = False
+                self.error_solution("No solution found or returned value is not a list of states.")
 
     def animate_solution(self, dt):
         """
@@ -152,6 +144,9 @@ class PuzzleController:
 
     def on_tile_press(self, index):
         """Maneja el click en una celda para mover manualmente las fichas."""
+        if self.is_animating:
+            return  # Desactiva interacción mientras se anima
+
         current_state = self.problem.start  # PuzzleState actual
         tiles = list(current_state.tiles)   # copiamos porque es tupla
 
@@ -164,8 +159,15 @@ class PuzzleController:
 
             # Nuevo estado
             new_state = PuzzleState(tiles)
-            self.problem.start = new_state  # <<<< aquí queda guardado como inicio
+            self.problem.start = new_state  # <<<< guardar como nuevo inicio
             self.app.layout.reset_board(new_state.tiles)  # refrescar tablero
+
+            # Verifica si es victoria
+            if self.is_goal_state(new_state):
+                self.app.show_popup("¡Victoria!", "Has resuelto el puzzle.")
+                self.app.layout.play_button.text = "Again?"
+                self.app.layout.play_button.disabled = False
+
 
     def is_adjacent(self, i1, i2):
         """Verifica si dos posiciones son adyacentes en la grilla 3x3."""
@@ -173,3 +175,11 @@ class PuzzleController:
         x2, y2 = divmod(i2, 3)
         return abs(x1 - x2) + abs(y1 - y2) == 1
 
+    def is_goal_state(self, state: State) -> bool:
+        """Verifica si el estado actual es el estado objetivo."""
+        return self.problem.is_goal(state)
+
+    def error_solution(self, message):
+        self.app.show_popup("Error", message)
+        self.app.layout.play_button.text = "Play"
+        self.app.layout.play_button.disabled = False
