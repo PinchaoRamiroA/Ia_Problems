@@ -98,7 +98,18 @@ class PuzzleLayout(BoxLayout):
         buttons_row.add_widget(self.play_button)
         buttons_row.add_widget(self.reset_button)
         buttons_row.add_widget(self.new_button)
-        buttons_row.add_widget(self.compare_button)
+        
+        compare_row = BoxLayout(orientation = 'horizontal', spacing=10, size_hint_y=0.2)
+        self.compare_button = Button(
+            text='Compare',
+            size_hint=(0.25, 1),
+            font_size='20sp',
+            background_normal='',
+            background_color=(0.6, 0.4, 0.1, 1),
+            color=(1, 1, 1, 1)
+        )
+        self.compare_button.bind(on_press=self.controller.run_heuristic_comparison)
+        compare_row.add_widget(self.compare_button)
 
         # Controles de animación
         anim_row = BoxLayout(orientation='horizontal', spacing=10, size_hint_y=0.2)
@@ -127,6 +138,7 @@ class PuzzleLayout(BoxLayout):
         header_layout.add_widget(algo_row)
         header_layout.add_widget(heur_row)
         header_layout.add_widget(buttons_row)
+        header_layout.add_widget(compare_row)
         header_layout.add_widget(anim_row)
 
         # ===============================

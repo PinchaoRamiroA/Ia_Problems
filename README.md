@@ -7,12 +7,12 @@ Ademas de hacer poder crear un cuadro comparativo entre las heuristicas con un g
 
 ### Algoritmos de Búsqueda Implementados
 
-Búsqueda No Informada:
+Búsqueda No Informada
     BFS (Breadth-First Search)
     DFS (Depth-First Search)
     UCS (Uniform-Cost Search)
 
-Búsqueda Informada:
+Búsqueda Informada
     Greedy (Greedy Best-First Search)
     A* (A-Star Search)
     Weighted A* (Weighted A-Star Search)
